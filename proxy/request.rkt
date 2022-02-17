@@ -1,35 +1,116 @@
 #lang typed/racket
 
-;; handle converting from a web-server request into one for the http-client
+(require typed/net/http-client
+         typed/net/url-structs
+         typed/web-server/http)
 
-;; what do I want? I need to take a request and give a different request
-;; so I need those types first
+;;(define-type Http-Version (U False "HTTP/1.1" "HTTP/2")) ;; not sure how to make the type checker ok with this, but would like it still...
+(define-type Http-Version (U False String)) ; should I keep these as Bytes?
+(define-type Status-Code (U False Positive-Index))
+(define-type Status-Message (U False String))
 
-;; I want to import request struct as a type from web-server/http I think
-(require/typed net/url-structs
-  [#:struct path/param ([path : (U String 'up 'same)]
-                        [param : (Listof String)])]
+;; keeping these transparent fits in with this being a repl driven tool
+;; the idea is to be able to look at the data by drilling down with functions
+;; so being able to see and drill down interactively is the whole point
+;; once there are multiple workers handling things in the background digging through the requests and responses will be a big task
+(struct status ((http-version : Http-Version)
+                (code : Status-Code)
+                (message : Status-Message)
+                (raw : String))
+  #:transparent)
 
-  [#:struct url ([scheme : (U False #"http")] ;; make this a U of valid schemes
-                 [user : (U False String)]
-                 [host : (U False String)]
-                 [port : (U False Positive-Index)]
-                 [path-absolute? : Boolean]
-                 [path : (Listof path/param)]
-                 [query : (Listof (Pairof Symbol (U False String)))]
-                 [fragment : (U False String)])])
+(struct neutral-request ((url : url)
+                         (headers : (Listof header)))
+  #:transparent)
 
-(require/typed web-server/http/request-structs
-  [#:struct header ([field : Bytes] [value : Bytes])]
+(struct neutral-response ((status : status)
+                          (headers : (Listof header))
+                          (body : Bytes))
+  #:transparent)
 
-  [#:struct request ([method : Bytes] ;; Make this a U of valid methods, eh?
-                     [uri : url]
-                     [headers/raw : (Listof header)]
-                      ;; skipping the binding struct(s) for now, not obvious that I'll care about bindings until I need file transfers
-                     [bindings/raw-promise : (Listof Any)]
-                     [post-data/raw : (U False Bytes)]
-                     [host-ip : String]
-                     [host-port : Number]
-                     [client-ip : String])])
+(define header-sep-byte 58)
 
-;; ok now I have types to bring in a request and work on it!
+#|
+ Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+|#
+(: status-line->status (-> String status))
+(define (status-line->status status-line)
+  (let ((status-list (string-split status-line " ")))
+    (if (>= (length status-list) 3)
+        (let* ((http-version (first status-list))
+               (http-version : Http-Version (if (or (equal? http-version "HTTP/1.1") (equal? http-version "HTTP/2"))
+                                                http-version
+                                                #f))
+               (code (string->number (second status-list)))
+               (code : Status-Code (if (and (exact-positive-integer? code) (< code 600))
+                                       code
+                                       #f))
+               (message : String (string-join (drop status-list 2) " ")))
+          (status http-version code message status-line))
+        (status #f #f #f status-line))))
+
+(: trim-leading-whitespace (-> (Listof Byte) (Listof Byte)))
+(define (trim-leading-whitespace bytes-list)
+  (let ((tab : Byte 9)
+        (space : Byte 32))
+    (cond ((empty? bytes-list)
+           bytes-list)
+          ((or (equal? (first bytes-list) space) (equal? (first bytes-list) tab))
+           (trim-leading-whitespace (drop bytes-list 1)))
+          (else bytes-list))))
+
+#|
+message-header = field-name ":" ( field-value )
+field-name     = token
+field-value    = *( field-content | LWS )
+field-content  = <the OCTETs making up the field-value
+and consisting of either *TEXT or combinations
+of token, separators, and quoted-string>
+|#
+(: header-bytes->headers (-> (Listof Bytes) (Listof header)))
+(define (header-bytes->headers header-byte-list)
+  (filter-map
+   (lambda ((header-bytes : Bytes))
+     (let* ((header-bytes-list : (Listof Byte) (bytes->list header-bytes))
+            (sep-loc (index-of header-bytes-list header-sep-byte)))
+       (if (exact-positive-integer? sep-loc)
+           (let-values ((((field-name : (Listof Byte)) (field-value : (Listof Byte))) (split-at header-bytes-list sep-loc)))
+             (header (list->bytes field-name)
+                     (list->bytes
+                      (trim-leading-whitespace
+                       (drop field-value 1)))))
+           #f)))
+   header-byte-list))
+
+;; caller closes body-port!
+(: read-body (-> Input-Port Bytes Bytes))
+(define (read-body body-port output-bytes)
+  (let ((this-byte : (U Byte EOF) (read-byte body-port)))
+    (if (eof-object? this-byte)
+        (bytes->immutable-bytes output-bytes) ; this is kept as bytes to defer thinking about encoding, not for mutability (but the typecheker doesn't check...)
+        (read-body body-port
+                   (bytes-append output-bytes (bytes this-byte))))))
+
+(: make-request (-> neutral-request neutral-response))
+(define (make-request request)
+  (let* ((url : url (neutral-request-url request))
+         (host (url-host url))
+         (host : String (cond ((string? host) host)
+                              (else "")))
+         (path (path/param-path (first (url-path url))))
+         (path : String (cond ((string? path) path)
+                              (else "/"))))
+    (let-values ((((status-line : Bytes) (headers : (Listof Bytes)) (body-port : Input-Port)) (http-sendrecv host path #:ssl? #f)))
+      
+      (let ((body (read-body body-port #"")))
+        (close-input-port body-port)
+        (neutral-response (status-line->status (bytes->string/utf-8 status-line))
+                          (header-bytes->headers headers)
+                          body)))))
+
+(define test-url (url "http" #f "google.com" 80 #f (list (path/param "/" '())) '() #f))
+
+
+;; TODO
+;; fn that takes a web-server request and makes it a neutral-request
+;; fn that takes a neutral response and makes it a web-server response
