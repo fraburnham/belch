@@ -2,13 +2,12 @@
 
 (require typed/web-server/http ;; try to move this to all typed once there is some progress on the rest
          web-server/servlet-dispatch
-         web-server/web-server)
+         web-server/web-server
+         "proxy/request.rkt")
 
 (define (proxy req)
   (println req)
-  (response/output
-   (lambda (out)
-     (displayln "Hello proxy!" out))))
+  (proxy-request-handler req))
 
 (define (start)
   (serve

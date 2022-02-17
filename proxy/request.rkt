@@ -1,18 +1,22 @@
 #lang typed/racket
 
+(provide proxy-request-handler)
+
 (require typed/net/http-client
          typed/net/url-structs
          typed/web-server/http)
 
 ;;(define-type Http-Version (U False "HTTP/1.1" "HTTP/2")) ;; not sure how to make the type checker ok with this, but would like it still...
-(define-type Http-Version (U False String)) ; should I keep these as Bytes?
-(define-type Status-Code (U False Positive-Index))
-(define-type Status-Message (U False String))
+(define-type Http-Version (Option String)) ; should I keep these as Bytes?
+(define-type Status-Code (Option Nonnegative-Integer))
+(define-type Status-Message (Option String))
 
-;; keeping these transparent fits in with this being a repl driven tool
-;; the idea is to be able to look at the data by drilling down with functions
-;; so being able to see and drill down interactively is the whole point
-;; once there are multiple workers handling things in the background digging through the requests and responses will be a big task
+#|
+keeping these transparent fits in with this being a repl driven tool
+the idea is to be able to look at the data by drilling down with functions
+so being able to see and drill down interactively is the whole point
+once there are multiple workers handling things in the background digging through the requests and responses will be a big task
+|#
 (struct status ((http-version : Http-Version)
                 (code : Status-Code)
                 (message : Status-Message)
@@ -31,7 +35,7 @@
 (define header-sep-byte 58)
 
 #|
- Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
 |#
 (: status-line->status (-> String status))
 (define (status-line->status status-line)
@@ -82,6 +86,26 @@ of token, separators, and quoted-string>
            #f)))
    header-byte-list))
 
+(: headers->header-bytes (-> (Listof header) (Listof Bytes)))
+(define (headers->header-bytes headers)
+  (map
+   (lambda ((header : header))
+     (let ((header-field : Bytes (header-field header))
+           (header-value : Bytes (header-value header)))
+       (bytes-append header-field #": " header-value)))
+   headers))
+
+(: path/params->path-string (-> (Listof path/param) String))
+(define (path/params->path-string path/params)
+  (foldl
+   (lambda ((path/param : path/param)
+            (path-accumulator : String))
+     (let* ((path (path/param-path path/param))
+            (path : String (if (string? path) path "")))
+       (string-append path-accumulator "/" path)))
+   ""
+   path/params))
+
 ;; caller closes body-port!
 (: read-body (-> Input-Port Bytes Bytes))
 (define (read-body body-port output-bytes)
@@ -91,26 +115,49 @@ of token, separators, and quoted-string>
         (read-body body-port
                    (bytes-append output-bytes (bytes this-byte))))))
 
-(: make-request (-> neutral-request neutral-response))
-(define (make-request request)
+(: proxy:make-request (-> neutral-request neutral-response))
+(define (proxy:make-request request)
   (let* ((url : url (neutral-request-url request))
          (host (url-host url))
          (host : String (cond ((string? host) host)
-                              (else "")))
-         (path (path/param-path (first (url-path url))))
-         (path : String (cond ((string? path) path)
-                              (else "/"))))
-    (let-values ((((status-line : Bytes) (headers : (Listof Bytes)) (body-port : Input-Port)) (http-sendrecv host path #:ssl? #f)))
-      
+                              (else ""))))
+    ;; would be nice to be able to pass the url type to an http client...
+    ;; will need to do stuff like assemble the path as it stands
+    ;; getting a 400 back from servers so this is probably fucked until I fix the path stuff and headers and such
+    (println request)
+    (let-values ((((status-line : Bytes) (headers : (Listof Bytes)) (body-port : Input-Port))
+                  (http-sendrecv host
+                                 (path/params->path-string (url-path url))
+                                 #:ssl? #f
+                                 #:headers (headers->header-bytes (neutral-request-headers request))
+                                 #:method #"GET"
+                                 )))
       (let ((body (read-body body-port #"")))
         (close-input-port body-port)
         (neutral-response (status-line->status (bytes->string/utf-8 status-line))
                           (header-bytes->headers headers)
                           body)))))
 
-(define test-url (url "http" #f "google.com" 80 #f (list (path/param "/" '())) '() #f))
+(: request->neutral-request (-> request neutral-request))
+(define (request->neutral-request request)
+  (neutral-request (request-uri request) (request-headers/raw request)))
 
+(: neutral-response->response (-> neutral-response response))
+(define (neutral-response->response neutral-response)
+  (let* ((status : status (neutral-response-status neutral-response))
+         (status-code : Status-Code (status-code status))
+         (status-code : Nonnegative-Integer (if (exact-positive-integer? status-code) status-code 599))
+         (status-message : Status-Message (status-message status))
+         (status-message : Bytes (if (bytes? status-message) status-message #"Proxy failed to process status message")))
+    (response status-code
+              status-message
+              (current-seconds)
+              #f ; mime type (should be proxying this!)
+              (neutral-response-headers neutral-response)
+              (lambda (out) (displayln (neutral-response-body neutral-response) out)))))
 
-;; TODO
-;; fn that takes a web-server request and makes it a neutral-request
-;; fn that takes a neutral response and makes it a web-server response
+(: proxy-request-handler (-> request response))
+(define (proxy-request-handler req)
+  (neutral-response->response
+   (proxy:make-request
+    (request->neutral-request req))))
