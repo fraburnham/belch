@@ -1,6 +1,6 @@
-#lang racket
+#lang typed/racket
 
-(require net/http-client)
+(require typed/net/http-client)
 
 ;; (http-sendrecv "google.com" "/" #:ssl? #t)
 

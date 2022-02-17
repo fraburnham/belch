@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require web-server/http
+(require typed/web-server/http ;; try to move this to all typed once there is some progress on the rest
          web-server/servlet-dispatch
          web-server/web-server)
 
