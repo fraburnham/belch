@@ -1,9 +1,11 @@
 #lang typed/racket
 
-(provide proxy-request-handler)
+(provide proxy-request-handler
+         (struct-out neutral-request-response))
 
 (require typed/net/http-client
          typed/net/url-structs
+         typed/racket/async-channel
          typed/web-server/http)
 
 ;;(define-type Http-Version (U False "HTTP/1.1" "HTTP/2")) ;; not sure how to make the type checker ok with this, but would like it still...
@@ -24,12 +26,18 @@ once there are multiple workers handling things in the background digging throug
   #:transparent)
 
 (struct neutral-request ((url : url)
+                         (method : Bytes)
+                         (data : (Option Bytes)) ;; maybe this is a port...
                          (headers : (Listof header)))
   #:transparent)
 
 (struct neutral-response ((status : status)
                           (headers : (Listof header))
                           (body : Bytes))
+  #:transparent)
+
+(struct neutral-request-response ((request : neutral-request)
+                                  (response : neutral-response))
   #:transparent)
 
 (define header-sep-byte 58)
@@ -129,7 +137,8 @@ of token, separators, and quoted-string>
                                  (path/params->path-string (url-path url))
                                  #:ssl? #f
                                  #:headers (headers->header-bytes (neutral-request-headers request))
-                                 #:method #"GET"
+                                 #:method (neutral-request-method request)
+                                 #:data (neutral-request-data request)
                                  #:content-decode '())))
       (let ((body (read-body body-port #"")))
         (close-input-port body-port)
@@ -139,7 +148,10 @@ of token, separators, and quoted-string>
 
 (: request->neutral-request (-> request neutral-request))
 (define (request->neutral-request request)
-  (neutral-request (request-uri request) (request-headers/raw request)))
+  (neutral-request (request-uri request)
+                   (request-method request)
+                   (request-post-data/raw request)
+                   (request-headers/raw request)))
 
 ;(: neutral-response->response (-> neutral-response response))
 (: neutral-response->response (-> neutral-response response))
@@ -162,8 +174,9 @@ of token, separators, and quoted-string>
               (lambda ((out : Output-Port))
                 (write-bytes (neutral-response-body neutral-response) out)))))
 
-(: proxy-request-handler (-> request response))
-(define (proxy-request-handler req)
-  (neutral-response->response
-   (proxy:make-request
-    (request->neutral-request req))))
+(: proxy-request-handler (-> (Async-Channelof neutral-request-response) (-> request response)))
+(define ((proxy-request-handler chan) req)
+  (let* ((request : neutral-request (request->neutral-request req))
+         (response : neutral-response (proxy:make-request request)))
+    (async-channel-put chan (neutral-request-response request response))
+    (neutral-response->response response)))
