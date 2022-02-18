@@ -124,14 +124,13 @@ of token, separators, and quoted-string>
     ;; would be nice to be able to pass the url type to an http client...
     ;; will need to do stuff like assemble the path as it stands
     ;; getting a 400 back from servers so this is probably fucked until I fix the path stuff and headers and such
-    (println request)
     (let-values ((((status-line : Bytes) (headers : (Listof Bytes)) (body-port : Input-Port))
                   (http-sendrecv host
                                  (path/params->path-string (url-path url))
                                  #:ssl? #f
                                  #:headers (headers->header-bytes (neutral-request-headers request))
                                  #:method #"GET"
-                                 )))
+                                 #:content-decode '())))
       (let ((body (read-body body-port #"")))
         (close-input-port body-port)
         (neutral-response (status-line->status (bytes->string/utf-8 status-line))
@@ -142,19 +141,26 @@ of token, separators, and quoted-string>
 (define (request->neutral-request request)
   (neutral-request (request-uri request) (request-headers/raw request)))
 
+;(: neutral-response->response (-> neutral-response response))
 (: neutral-response->response (-> neutral-response response))
 (define (neutral-response->response neutral-response)
   (let* ((status : status (neutral-response-status neutral-response))
          (status-code : Status-Code (status-code status))
          (status-code : Nonnegative-Integer (if (exact-positive-integer? status-code) status-code 599))
          (status-message : Status-Message (status-message status))
-         (status-message : Bytes (if (bytes? status-message) status-message #"Proxy failed to process status message")))
+         (status-message : String (if (string? status-message) status-message "Proxy failed to process status message")))
     (response status-code
-              status-message
+              (string->bytes/utf-8 status-message)
               (current-seconds)
-              #f ; mime type (should be proxying this!)
-              (neutral-response-headers neutral-response)
-              (lambda (out) (displayln (neutral-response-body neutral-response) out)))))
+              #f ; don't set mime type, let Content-Type set it
+              (filter
+               (lambda ((h : header))
+                 ;; this is a hack to work around issues caused by chunked encoding
+                 ;; a real fix will require me understanding how chunked encoding works in real life...
+                 (not (bytes=? #"Transfer-Encoding" (header-field h))))
+               (neutral-response-headers neutral-response))
+              (lambda ((out : Output-Port))
+                (write-bytes (neutral-response-body neutral-response) out)))))
 
 (: proxy-request-handler (-> request response))
 (define (proxy-request-handler req)

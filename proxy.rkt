@@ -5,13 +5,9 @@
          web-server/web-server
          "proxy/request.rkt")
 
-(define (proxy req)
-  (println req)
-  (proxy-request-handler req))
-
 (define (start)
   (serve
-   #:dispatch (dispatch/servlet proxy)
+   #:dispatch (dispatch/servlet proxy-request-handler)
    #:port 8888))
 
 (define stop (start))
