@@ -18,13 +18,13 @@ Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
   (let ((status-list (string-split status-line " ")))
     (if (>= (length status-list) 3)
         (let* ((http-version (first status-list))
-               (http-version : data:Http-Version (if (or (equal? http-version "HTTP/1.1") (equal? http-version "HTTP/2"))
-                                                http-version
-                                                #f))
+               (http-version : (Option data:Http-Version) (if (data:http-version? http-version)
+                                                              http-version
+                                                              #f))
                (code (string->number (second status-list)))
-               (code : data:Status-Code (if (and (exact-positive-integer? code) (< code 600))
-                                       code
-                                       #f))
+               (code : (Option data:Status-Code) (if (and (exact-positive-integer? code) (< code 600))
+                                                     code
+                                                     #f))
                (message : String (string-join (drop status-list 2) " ")))
           (data:status http-version code message status-line))
         (data:status #f #f #f status-line))))
@@ -111,23 +111,28 @@ of token, separators, and quoted-string>
       (let ((body (read-body body-port #"")))
         (close-input-port body-port)
         (data:response (status-line->data:status (bytes->string/utf-8 status-line))
-                          (header-bytes->headers headers)
-                          body)))))
+                       (header-bytes->headers headers)
+                       body)))))
 
 (: request->data:request (-> request data:request))
 (define (request->data:request request)
-  (data:request (request-uri request)
-                   (request-method request)
-                   (request-post-data/raw request)
-                   (request-headers/raw request)))
+  (let* ((method : Bytes (request-method request))
+         ;; I wonder if this will cause me headache. The case where an incoming request
+         ;; doesn't have a method seems absurd based on the contract provided by the
+         ;; web server lib, but it doesn't constrain the method as much as I do...
+         (method : data:Request-Method (if (data:request-method? method) method #"GET")))
+    (data:request (request-uri request)
+                  method
+                  (request-post-data/raw request)
+                  (request-headers/raw request))))
 
 ;(: data:response->response (-> data:response response))
 (: data:response->response (-> data:response response))
 (define (data:response->response data:response)
   (let* ((status : data:status (data:response-status data:response))
-         (status-code : data:Status-Code (data:status-code status))
+         (status-code : (Option data:Status-Code) (data:status-code status))
          (status-code : Nonnegative-Integer (if (exact-positive-integer? status-code) status-code 599))
-         (status-message : data:Status-Message (data:status-message status))
+         (status-message : (Option data:Status-Message) (data:status-message status))
          (status-message : String (if (string? status-message) status-message "Proxy failed to process status message")))
     (response status-code
               (string->bytes/utf-8 status-message)

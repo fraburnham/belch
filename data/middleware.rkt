@@ -3,6 +3,7 @@
 (provide apply)
 
 (require "types.rkt"
+         "params.rkt"
          (prefix-in http: typed/web-server/http))
 
 (require/typed file/gunzip
