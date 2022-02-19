@@ -10,11 +10,11 @@
 (: data* (Listof request-response))
 (define data* '())
 
-(: store (-> request-response Void))
-(define (store req-resp)
+(: store (-> middleware:middlewares request-response Void))
+(define (store mids req-resp)
   ;; run some normalizing stuff like decoding the gzipped data
   ;; and storing it as bytes
-  (set! data* (cons (middleware:apply req-resp) data*)))
+  (set! data* (cons (middleware:apply mids req-resp) data*)))
 
 (: data (-> (Listof request-response)))
 (define (data) ; dunno if I care to keep this... it does keep data* safe from set! happening elsewhere

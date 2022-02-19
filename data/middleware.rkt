@@ -1,6 +1,10 @@
 #lang typed/racket
 
-(provide apply)
+(provide apply
+         gunzip
+         (struct-out middlewares)
+         Response-Middleware
+         Request-Middleware)
 
 (require "types.rkt"
          "params.rkt"
@@ -11,7 +15,9 @@
 
 (define-type Request-Middleware (-> request request))
 (define-type Response-Middleware (-> response response))
-(define-type Middleware (-> request-response request-response))
+
+(struct middlewares ((request : (Listof Request-Middleware))
+                     (response : (Listof Response-Middleware))))
 
 (: gunzip Response-Middleware)
 (define (gunzip resp)
@@ -26,12 +32,18 @@
                       (get-output-bytes out))))
         resp)))
 
-(: apply Middleware)
-(define (apply req-resp)
+(: apply (-> middlewares request-response request-response))
+(define (apply mids req-resp)
   (let ((req : request (request-response-request req-resp))
         (resp : response (request-response-response req-resp)))
-    ;; keeping this stupid for now
-    ;; would like to get a list of middlewares for each side in later...
-    ;; this middleware point here could also be where we tell listeners that a new item has been added...
-    ;; or maybe we don't bother and let user.rkt handle that for now...
-    (request-response req (gunzip resp))))
+    (request-response
+     (foldl
+      (lambda ((request-handler : Request-Middleware) (req : request))
+        (request-handler req))
+      req
+      (middlewares-request mids))
+     (foldl
+      (lambda ((response-handler : Response-Middleware) (resp : response))
+        (response-handler resp))
+      resp
+      (middlewares-response mids)))))

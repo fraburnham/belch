@@ -1,9 +1,5 @@
 #lang typed/racket
 
-;; these types should probably live with the data storage stuff instead of here
-;; the proxy should care mostly about getting the request made and the types it uses
-;; are based on the integration with the data store
-
 (provide (struct-out request-response)
          (struct-out status)
          (struct-out request)

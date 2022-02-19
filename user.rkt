@@ -3,6 +3,7 @@
 (require typed/racket/async-channel
          "proxy/request.rkt"
          "data/types.rkt"
+         (prefix-in data: "data/middleware.rkt")
          (prefix-in data: "data.rkt"))
 
 (require/typed "proxy.rkt"
@@ -32,12 +33,8 @@
 
 (: store-req-resp (-> request-response Void))
 (define (store-req-resp req-resp)
-  ;; this would put the req-resp in state somewhere that it can be looked over manually (or automatically)
-  ;; if this is abstracted well then storing something could trigger reader workers that check for results
-
-  ;; this fn should have some middleware that unzips the request?
-  ;; maybe store itself should
-  (data:store req-resp)
+  (let ((middleware (data:middlewares '() (list data:gunzip))))
+    (data:store middleware req-resp))
   (void))
 
 (: worker-handler (-> (Async-Channelof request-response) (-> Void)))
