@@ -7,7 +7,7 @@
          Response-Middleware
          Request-Middleware)
 
-(require "types.rkt"
+(require "../http/types.rkt"
          "params.rkt"
          (prefix-in http: typed/web-server/http))
 

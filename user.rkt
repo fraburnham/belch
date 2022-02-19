@@ -1,8 +1,7 @@
 #lang typed/racket
 
 (require typed/racket/async-channel
-         "proxy/request.rkt"
-         "data/types.rkt"
+         "http/types.rkt"
          (prefix-in data: "data/middleware.rkt")
          (prefix-in data: "data.rkt"))
 

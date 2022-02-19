@@ -1,6 +1,6 @@
 #lang typed/racket
 
-(require "../data/types.rkt"
+(require "../http/types.rkt"
          "../proxy/request.rkt")
 
 (: payloads (Listof Bytes))

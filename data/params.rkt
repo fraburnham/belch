@@ -3,7 +3,7 @@
 (provide (struct-out param)
          post-body->params)
 
-(require "types.rkt")
+(require "../http/types.rkt")
 
 (: split-kvp (-> (Listof Byte) (Option param)))
 (define (split-kvp kvp)

@@ -5,7 +5,7 @@
          process
          data)
 
-(require "data/types.rkt"
+(require "http/types.rkt"
          (prefix-in middleware: "data/middleware.rkt"))
 
 (: data* (Listof request-response))
