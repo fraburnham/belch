@@ -5,9 +5,11 @@
          web-server/web-server
          "proxy/request.rkt")
 
-(define (start)
-  (serve
-   #:dispatch (dispatch/servlet proxy-request-handler)
-   #:port 8888))
+(provide start)
 
-(define stop (start))
+;; returns a fn to stop the proxy server
+; (: start (-> (-> Void)))
+(define (start chan)
+  (serve
+   #:dispatch (dispatch/servlet (proxy-request-handler chan))
+   #:port 8888))
