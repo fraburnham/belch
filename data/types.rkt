@@ -4,10 +4,10 @@
 ;; the proxy should care mostly about getting the request made and the types it uses
 ;; are based on the integration with the data store
 
-(provide (struct-out neutral-request-response)
+(provide (struct-out request-response)
          (struct-out status)
-         (struct-out neutral-request)
-         (struct-out neutral-response)
+         (struct-out request)
+         (struct-out response)
          Http-Version
          Status-Code
          Status-Message)
@@ -32,18 +32,18 @@ once there are multiple workers handling things in the background digging throug
                 (raw : String))
   #:transparent)
 
-(struct neutral-request ((url : url)
-                         (method : Bytes)
-                         (data : (Option Bytes)) ;; maybe this is a port...
-                         (headers : (Listof header)))
+(struct request ((url : url)
+                 (method : Bytes)
+                 (data : (Option Bytes))
+                 (headers : (Listof header)))
   #:transparent)
 
-(struct neutral-response ((status : status)
-                          (headers : (Listof header))
-                          (body : Bytes))
+(struct response ((status : status)
+                  (headers : (Listof header))
+                  (body : Bytes))
   #:transparent)
 
-(struct neutral-request-response ((request : neutral-request)
-                                  (response : neutral-response))
+(struct request-response ((request : request)
+                          (response : response))
   #:transparent)
 

@@ -6,28 +6,28 @@
          typed/net/url-structs
          typed/racket/async-channel
          typed/web-server/http
-         "types.rkt")
+         (prefix-in data: "../data/types.rkt"))
 
 (define header-sep-byte 58)
 
 #|
 Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
 |#
-(: status-line->status (-> String status))
-(define (status-line->status status-line)
+(: status-line->data:status (-> String data:status))
+(define (status-line->data:status status-line)
   (let ((status-list (string-split status-line " ")))
     (if (>= (length status-list) 3)
         (let* ((http-version (first status-list))
-               (http-version : Http-Version (if (or (equal? http-version "HTTP/1.1") (equal? http-version "HTTP/2"))
+               (http-version : data:Http-Version (if (or (equal? http-version "HTTP/1.1") (equal? http-version "HTTP/2"))
                                                 http-version
                                                 #f))
                (code (string->number (second status-list)))
-               (code : Status-Code (if (and (exact-positive-integer? code) (< code 600))
+               (code : data:Status-Code (if (and (exact-positive-integer? code) (< code 600))
                                        code
                                        #f))
                (message : String (string-join (drop status-list 2) " ")))
-          (status http-version code message status-line))
-        (status #f #f #f status-line))))
+          (data:status http-version code message status-line))
+        (data:status #f #f #f status-line))))
 
 (: trim-leading-whitespace (-> (Listof Byte) (Listof Byte)))
 (define (trim-leading-whitespace bytes-list)
@@ -91,9 +91,9 @@ of token, separators, and quoted-string>
         (read-body body-port
                    (bytes-append output-bytes (bytes this-byte))))))
 
-(: proxy:make-request (-> neutral-request neutral-response))
+(: proxy:make-request (-> data:request data:response))
 (define (proxy:make-request request)
-  (let* ((url : url (neutral-request-url request))
+  (let* ((url : url (data:request-url request))
          (host (url-host url))
          (host : String (cond ((string? host) host)
                               (else ""))))
@@ -104,30 +104,30 @@ of token, separators, and quoted-string>
                   (http-sendrecv host
                                  (path/params->path-string (url-path url))
                                  #:ssl? #f
-                                 #:headers (headers->header-bytes (neutral-request-headers request))
-                                 #:method (neutral-request-method request)
-                                 #:data (neutral-request-data request)
+                                 #:headers (headers->header-bytes (data:request-headers request))
+                                 #:method (data:request-method request)
+                                 #:data (data:request-data request)
                                  #:content-decode '())))
       (let ((body (read-body body-port #"")))
         (close-input-port body-port)
-        (neutral-response (status-line->status (bytes->string/utf-8 status-line))
+        (data:response (status-line->data:status (bytes->string/utf-8 status-line))
                           (header-bytes->headers headers)
                           body)))))
 
-(: request->neutral-request (-> request neutral-request))
-(define (request->neutral-request request)
-  (neutral-request (request-uri request)
+(: request->data:request (-> request data:request))
+(define (request->data:request request)
+  (data:request (request-uri request)
                    (request-method request)
                    (request-post-data/raw request)
                    (request-headers/raw request)))
 
-;(: neutral-response->response (-> neutral-response response))
-(: neutral-response->response (-> neutral-response response))
-(define (neutral-response->response neutral-response)
-  (let* ((status : status (neutral-response-status neutral-response))
-         (status-code : Status-Code (status-code status))
+;(: data:response->response (-> data:response response))
+(: data:response->response (-> data:response response))
+(define (data:response->response data:response)
+  (let* ((status : data:status (data:response-status data:response))
+         (status-code : data:Status-Code (data:status-code status))
          (status-code : Nonnegative-Integer (if (exact-positive-integer? status-code) status-code 599))
-         (status-message : Status-Message (status-message status))
+         (status-message : data:Status-Message (data:status-message status))
          (status-message : String (if (string? status-message) status-message "Proxy failed to process status message")))
     (response status-code
               (string->bytes/utf-8 status-message)
@@ -138,13 +138,13 @@ of token, separators, and quoted-string>
                  ;; this is a hack to work around issues caused by chunked encoding
                  ;; a real fix will require me understanding how chunked encoding works in real life...
                  (not (bytes=? #"Transfer-Encoding" (header-field h))))
-               (neutral-response-headers neutral-response))
+               (data:response-headers data:response))
               (lambda ((out : Output-Port))
-                (write-bytes (neutral-response-body neutral-response) out)))))
+                (write-bytes (data:response-body data:response) out)))))
 
-(: proxy-request-handler (-> (Async-Channelof neutral-request-response) (-> request response)))
+(: proxy-request-handler (-> (Async-Channelof data:request-response) (-> request response)))
 (define ((proxy-request-handler chan) req)
-  (let* ((request : neutral-request (request->neutral-request req))
-         (response : neutral-response (proxy:make-request request)))
-    (async-channel-put chan (neutral-request-response request response))
-    (neutral-response->response response)))
+  (let* ((request : data:request (request->data:request req))
+         (response : data:response (proxy:make-request request)))
+    (async-channel-put chan (data:request-response request response))
+    (data:response->response response)))
