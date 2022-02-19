@@ -24,7 +24,10 @@
             (if (param? p)
                   (isolate-kvp (drop rest-body 1) (cons p params))
                   (isolate-kvp (drop rest-body 1) (cons (param #"FAILED TO PARSE" #"FAILED TO PARSE") params)))))
-        params)))
+        (let ((p : (Option param) (split-kvp body)))
+          (if (param? p)
+              (cons p params)
+              (cons (param #"FAILED TO PARSE" #"FAILED TO PARSE") params))))))
 
 (: post-body->params (-> Bytes (Listof param)))
 (define (post-body->params body)

@@ -33,7 +33,7 @@
 
 (: store-req-resp (-> request-response Void))
 (define (store-req-resp req-resp)
-  (let ((middleware (data:middlewares '() (list data:gunzip))))
+  (let ((middleware (data:middlewares (list data:post-params) (list data:gunzip))))
     (data:store middleware req-resp))
   (void))
 

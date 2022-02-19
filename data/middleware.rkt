@@ -3,6 +3,7 @@
 (provide apply
          gunzip
          (struct-out middlewares)
+         post-params
          Response-Middleware
          Request-Middleware)
 
@@ -31,6 +32,15 @@
                       (response-headers resp)
                       (get-output-bytes out))))
         resp)))
+
+(: post-params Request-Middleware)
+(define (post-params req)
+  (request (request-url req)
+           (request-method req)
+           (request-data req)
+           (request-headers req)
+           (let ((data : (Option Bytes) (request-data req)))
+             (if (bytes? data) (post-body->params data) '()))))
 
 (: apply (-> middlewares request-response request-response))
 (define (apply mids req-resp)
