@@ -1,7 +1,9 @@
 #lang typed/racket
 
+(provide attack)
+
 (require "../http/types.rkt"
-         "../proxy/request.rkt")
+         "../http/request.rkt")
 
 (: payloads (Listof Bytes))
 (define payloads
@@ -25,6 +27,8 @@
 (define (add-request req reqs)
   (cons req reqs))
 
+;; heh, I think the request is wrong because I'm not updating the headers
+;; need to drop content-length
 (: create-attack-requests (-> request (Listof request)))
 (define (create-attack-requests req)
   (let ((params (request-params req)))
@@ -44,15 +48,19 @@
                             (param (param-name p) payload)
                             existing-p))
                       params))
-                    (request-headers req)
+                    (filter
+                     (lambda ((h : header))
+                       (not (bytes=? (header-field h) #"Content-Length")))
+                     (request-headers req))
                     (request-params req)))
          payloads)))
      '()
      params)))
 
-(: attack (-> request Void))
+(: attack (-> request (Listof request-response)))
 (define (attack req)
-  (for ((req (create-attack-requests req)))
-    ;; this request needs to be stored!
-    ;; but don't let it trigger more requests!
-    (proxy:make-request req)))
+  (map ; take advantage of racket being eager by default
+   (lambda ((req : request))
+     (request-response req
+                       (send req)))
+   (create-attack-requests req)))

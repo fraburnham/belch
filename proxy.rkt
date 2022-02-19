@@ -8,7 +8,7 @@
 
 ;; returns a fn to stop the proxy server
 ; (: start (-> (-> Void)))
-(define (start chan)
+(define (start recorder-chan attacker-chan)
   (serve
-   #:dispatch (dispatch/servlet (proxy:request-handler chan))
+   #:dispatch (dispatch/servlet (proxy:request-handler recorder-chan attacker-chan))
    #:port 8888))

@@ -42,9 +42,10 @@
               (lambda ((out : Output-Port))
                 (write-bytes (http:response-body http:response) out)))))
 
-(: request-handler (-> (Async-Channelof http:request-response) (-> request response)))
-(define ((request-handler chan) req)
+(: request-handler (-> (Async-Channelof http:request-response) (Async-Channelof http:request-response) (-> request response)))
+(define ((request-handler recorder-chan attacker-chan) req)
   (let* ((request : http:request (request->http:request req))
          (response : http:response (http:send request)))
-    (async-channel-put chan (http:request-response request response))
+    (async-channel-put recorder-chan (http:request-response request response))
+    (async-channel-put attacker-chan (http:request-response request response))
     (http:response->response response)))
