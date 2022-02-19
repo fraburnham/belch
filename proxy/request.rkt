@@ -1,6 +1,7 @@
 #lang typed/racket
 
-(provide proxy-request-handler)
+(provide proxy-request-handler
+         proxy:make-request)
 
 (require typed/net/http-client
          typed/net/url-structs
