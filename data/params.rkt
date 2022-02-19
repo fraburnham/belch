@@ -3,12 +3,7 @@
 (provide (struct-out param)
          post-body->params)
 
-;; handle splitting post params
-;; in a diff file can handle urlencode/decode (but I don't really care about it yet)
-
-(struct param ((name : Bytes)
-               (value : Bytes))
-  #:transparent)
+(require "types.rkt")
 
 (: split-kvp (-> (Listof Byte) (Option param)))
 (define (split-kvp kvp)

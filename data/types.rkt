@@ -8,6 +8,7 @@
          (struct-out status)
          (struct-out request)
          (struct-out response)
+         (struct-out param)
          Http-Version
          Request-Method
          Status-Code
@@ -68,6 +69,10 @@ the idea is to be able to look at the data by drilling down with functions
 so being able to see and drill down interactively is the whole point
 once there are multiple workers handling things in the background digging through the requests and responses will be a big task
 |#
+(struct param ((name : Bytes)
+               (value : Bytes))
+  #:transparent)
+
 (struct status ((http-version : (Option Http-Version))
                 (code : (Option Status-Code))
                 (message : (Option Status-Message))
@@ -77,7 +82,8 @@ once there are multiple workers handling things in the background digging throug
 (struct request ((url : url)
                  (method : Request-Method)
                  (data : (Option Bytes))
-                 (headers : (Listof header)))
+                 (headers : (Listof header))
+                 (params : (Listof param)))
   #:transparent)
 
 (struct response ((status : status)

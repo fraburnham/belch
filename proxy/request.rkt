@@ -124,7 +124,8 @@ of token, separators, and quoted-string>
     (data:request (request-uri request)
                   method
                   (request-post-data/raw request)
-                  (request-headers/raw request))))
+                  (request-headers/raw request)
+                  '())))
 
 ;(: data:response->response (-> data:response response))
 (: data:response->response (-> data:response response))
