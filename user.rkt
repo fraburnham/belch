@@ -1,6 +1,7 @@
 #lang typed/racket
 
 (require (prefix-in xss: "attack/xss.rkt")
+         (prefix-in idor: "attack/idor.rkt")
          "http/types.rkt"
          typed/racket/async-channel
          (prefix-in data: "data/middleware.rkt")
@@ -60,6 +61,29 @@
     (let* ((req-resp : request-response (async-channel-get chan))
            (req-resp : request-response (process-req-resp req-resp)))
       ;; This means double processing of the request. Factor that out later...
-      (map data:store (xss:attack (request-response-request req-resp)))
+      ;; I think I can factor this out by attaching info about who generated the req-resp
+      ;; so workers can skip it on their own (or select it)
+      (map data:store (append*
+                       ;; there is a bug in here that the data processers aren't running on these!
+                       ;; the requests responses should be popped back on the chan so that the recorder can
+                       ;; handle them at the top and the callers can self identify and skip (or otherwise filter)
+                       (map
+                        (lambda ((attacker : (-> request (Listof request-response)))) : (Listof request-response)
+                          (attacker (request-response-request req-resp)))
+                        (list xss:attack idor:attack))))
       (handler)))
   handler)
+
+(: find-ctf-flags (-> (Listof request-response) (Listof Bytes)))
+(define (find-ctf-flags data)
+  (remove-duplicates
+   (append*
+    (map
+     (compose
+      (lambda ((body : Bytes)) (regexp-match* #rx#"\\^FLAG\\^.*?\\$FLAG\\$" body))
+      (compose response-body
+               request-response-response))
+     data))))
+
+;; since there is no redirect follower I'm losing some of the data from the edit requests (since it gets clobbered by another edit before it is read)
+;; so let's get redirect following as an option for requests (that'll get me all 4 automatically from the microcms v1 ctf)
