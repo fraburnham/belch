@@ -14,12 +14,12 @@ Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     (if (>= (length status-list) 3)
         (let* ((http-version (first status-list))
                (http-version : (Option Http-Version) (if (http-version? http-version)
-                                                              http-version
-                                                              #f))
+                                                         http-version
+                                                         #f))
                (code (string->number (second status-list)))
                (code : (Option Status-Code) (if (and (exact-positive-integer? code) (< code 600))
-                                                     code
-                                                     #f))
+                                                code
+                                                #f))
                (message : String (string-join (drop status-list 2) " ")))
           (status http-version code message status-line))
         (status #f #f #f status-line))))
