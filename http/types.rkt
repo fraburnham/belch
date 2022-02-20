@@ -6,6 +6,8 @@
          (struct-out response)
          (struct-out param)
          (struct-out header)
+         (struct-out path/param)
+         (struct-out url)
          Http-Version
          Request-Method
          Status-Code

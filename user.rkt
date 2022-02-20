@@ -9,6 +9,9 @@
 (require/typed "proxy.rkt"
   (start (-> (Async-Channelof request-response) (Async-Channelof request-response) (-> Void))))
 
+(require/typed "data/save.rkt"
+  (save (-> String (Listof request-response) Void)))
+
 (struct system ((worker-stoppers : (Listof (-> Void)))
                 (proxy-stopper : (-> Void))))
 
