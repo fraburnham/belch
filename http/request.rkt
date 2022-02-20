@@ -1,9 +1,13 @@
 #lang typed/racket
 
-(provide send)
+(provide follow-redirect
+         send)
 
 (require typed/net/http-client
          typed/net/url-structs
+         typed/net/url
+         (only-in typed/web-server/http
+                  headers-assq*)
          "header.rkt"
          "status.rkt"
          "types.rkt")
@@ -27,6 +31,35 @@
         (bytes->immutable-bytes output-bytes) ; this is kept as bytes to defer thinking about encoding, not for mutability (but the typecheker doesn't check...)
         (read-body body-port
                    (bytes-append output-bytes (bytes this-byte))))))
+
+(: follow-redirect (-> request-response (Listof request-response)))
+(define (follow-redirect req-resp)
+  (: recur (-> request-response (Listof request-response) (Listof request-response)))
+  (define (recur req-resp return-reqs-resps)
+    (let* ((req : request (request-response-request req-resp))
+           (resp : response (request-response-response req-resp))
+           (status-code : (Option Status-Code) (status-code (response-status resp)))
+           (status-code : Status-Code (if (false? status-code) 0 status-code)))
+      (if (or (= status-code 301) (= status-code 302))
+          (let ((location : (Option header) (headers-assq* #"Location" (response-headers resp))))
+            (if (header? location)
+                (let* ((referrer : header (header #"Referrer" (string->bytes/utf-8 (url->string (request-url req)))))
+                       (req-method : Request-Method #"GET")
+                       ;; the referrer header isn't being used
+                       (req : request (struct-copy request
+                                                   req
+                                                   (url (string->url (bytes->string/utf-8 (header-value location))))
+                                                   (method req-method)))
+                       (resp : response (send req)))
+                  (recur
+                   (request-response req
+                                     resp
+                                     (request-response-originator req-resp))
+                   (cons req-resp return-reqs-resps)))
+                ;; failed to find location to follow!
+                (cons req-resp return-reqs-resps)))
+          (cons req-resp return-reqs-resps))))
+  (recur req-resp '()))
 
 (: send (-> request response))
 (define (send request)

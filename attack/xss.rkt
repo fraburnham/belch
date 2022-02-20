@@ -62,5 +62,6 @@
   (map ; take advantage of racket being eager by default
    (lambda ((req : request))
      (request-response req
-                       (send req)))
+                       (send req)
+                       'xss))
    (create-attack-requests req)))

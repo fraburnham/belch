@@ -19,7 +19,7 @@
 (serializable-struct status (http-version code message raw))
 (serializable-struct request (url method data headers params))
 (serializable-struct response (status headers body))
-(serializable-struct request-response (request response))
+(serializable-struct request-response (request response originator))
 
 (define (http:path/param->path/param p)
   (path/param (client:path/param-path p)
@@ -64,7 +64,8 @@
 (define (http:request-response->serializable-request-response req-resp)
   (request-response
    (http:request->serializable-request (http:request-response-request req-resp))
-   (http:response->serializable-response (http:request-response-response req-resp))))
+   (http:response->serializable-response (http:request-response-response req-resp))
+   (http:request-response-originator req-resp)))
 
 (define (save filepath data)
   (let ((out (open-output-file filepath))

@@ -91,5 +91,6 @@ once there are multiple workers handling things in the background digging throug
   #:transparent)
 
 (struct request-response ((request : request)
-                          (response : response))
+                          (response : response)
+                          (originator : Symbol))
   #:transparent)

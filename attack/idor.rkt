@@ -59,6 +59,7 @@
       (map
        (lambda ((req : request)) : request-response
          (request-response req
-                           (send req)))
+                           (send req)
+                           'idor))
        (create-attack-requests req))
       '()))
