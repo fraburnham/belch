@@ -24,7 +24,7 @@
        (map
         (lambda ((payload : a)) : (Listof b)
           (let ((new-element : b (xfrm payload element)))
-            (replace new-element element elements)))
+            (replace element new-element elements)))
         payloads))
      elements))))
 
@@ -49,6 +49,11 @@
      (lambda ((params : (Listof param))) : request
        (struct-copy request
                     req
+                    (headers (filter
+                              (lambda ((h : header))
+                                (string=? (bytes->string/utf-8 (header-field h))
+                                          "content-length"))
+                              (request-headers req)))
                     (data (params->bytes params))
                     (params params)))
      payload-params)))
