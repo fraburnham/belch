@@ -46,14 +46,14 @@
   (let* ((params : (Listof param) (request-params req))
          (payload-params : (Listof (Listof param)) (make-payloads xfrm params payloads)))
     (map
-     (lambda ((params : (Listof param))) : request
+     (lambda ((ps : (Listof param))) : request
        (struct-copy request
                     req
                     (headers (filter
                               (lambda ((h : header))
-                                (string=? (bytes->string/utf-8 (header-field h))
-                                          "content-length"))
+                                (not (string=? (bytes->string/utf-8 (header-field h))
+                                               "content-length")))
                               (request-headers req)))
-                    (data (params->bytes params))
-                    (params params)))
+                    (data (params->bytes ps))
+                    (params ps)))
      payload-params)))

@@ -2,6 +2,7 @@
 
 (require (prefix-in xss: "attack/xss.rkt")
          (prefix-in idor: "attack/idor.rkt")
+         (prefix-in sqli: "attack/sqli.rkt")
          "http/types.rkt"
          (prefix-in http: "http/request.rkt")
          typed/racket/async-channel
@@ -44,7 +45,7 @@
         (lambda ((attacker : (-> request (Listof request-response)))) : (Listof request-response)
           (append*
            (map http:follow-redirect (attacker (request-response-request req-resp)))))
-        (list xss:attack idor:attack)))
+        (list xss:attack idor:attack sqli:attack)))
       '()))
 
 (: work-handler (-> (Async-Channelof request-response) (-> Any)))
@@ -78,6 +79,3 @@
   (remove-duplicates
    (filter-map extract-ctf-flag data)))
 
-;; I forgot the final flag was an sqli in the param
-;; that is an idea I should capture before I move on for xss and sqli
-;; (make sqli first, I suppose)
