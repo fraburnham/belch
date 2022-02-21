@@ -2,15 +2,14 @@
 
 (provide attack)
 
-(require "../http/types.rkt"
-         "../http/request.rkt"
+(require "../http/request.rkt"
+         "../http/types.rkt"
          (prefix-in payloadize: "payloadize.rkt"))
 
-(: payloads (Listof Bytes))
+(: paylods (Listof Bytes))
 (define payloads
-  '(#"<script>alert(1);</script>"
-    #"<img src=\"#\" onerror=\"alert(1);\" />"
-    #"<p onload=\"alert(1);\"></p>"))
+  '(#"' or 1=1; --"
+    #"~!@#$%^`&*()_+-={}|[]\\;?><,./\""))
 
 (: payload->path/param (-> Bytes path/param path/param))
 (define (payload->path/param payload element)
@@ -27,9 +26,9 @@
 (: attack (-> request (Listof request-response)))
 (define (attack req)
   (map
-   (lambda ((req : request))
+   (lambda ((req : request)) : request-response
      (request-response req
                        (send req)
-                       'xss))
+                       'sqli))
    (append (payloadize:form-params payload->param req payloads)
            (payloadize:url-paths payload->path/param req payloads))))
