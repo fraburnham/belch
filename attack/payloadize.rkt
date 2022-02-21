@@ -51,7 +51,7 @@
                     req
                     (headers (filter
                               (lambda ((h : header))
-                                (not (string=? (bytes->string/utf-8 (header-field h))
+                                (not (string=? (string-downcase (bytes->string/utf-8 (header-field h)))
                                                "content-length")))
                               (request-headers req)))
                     (data (params->bytes ps))

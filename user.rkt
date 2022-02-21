@@ -78,4 +78,3 @@
 (define (find-ctf-flags data)
   (remove-duplicates
    (filter-map extract-ctf-flag data)))
-
