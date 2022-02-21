@@ -6,7 +6,7 @@
          "../http/types.rkt"
          (prefix-in payloadize: "payloadize.rkt"))
 
-(: paylods (Listof Bytes))
+(: payloads (Listof Bytes))
 (define payloads
   '(#"' or 1=1; --"
     #"~!@#$%^`&*()_+-={}|[]\\;?><,./\""))
